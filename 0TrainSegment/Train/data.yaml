@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 5
+names: ['abnormalities', 'diaphragm', 'heart', 'left_lobe', 'right_lobe']
+
+roboflow:
+  workspace: cxr-segmentation-with-abnormalities-dataset
+  project: cxr-organ-object-detection
+  version: 1
+  license: BY-NC-SA 4.0
+  url: https://universe.roboflow.com/cxr-segmentation-with-abnormalities-dataset/cxr-organ-object-detection/dataset/1
