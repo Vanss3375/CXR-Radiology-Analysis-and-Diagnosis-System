@@ -4,12 +4,11 @@ from pathlib import Path
 from typing import List, Tuple
 from ultralytics import YOLO
 from PIL import Image, ImageDraw
-
+import csv
 
 def load_yolo_model(model_path: str):
     model = YOLO(model_path)
     return model
-
 
 def select_random_images(folder_path: str) -> List[str]:
     extensions = ['*.png', '*.jpg', '*.jpeg']
@@ -18,7 +17,6 @@ def select_random_images(folder_path: str) -> List[str]:
         images.extend(Path(folder_path).glob(ext))
     return random.sample(images, 5)
 
-
 def get_bboxes(predictions, label: str) -> List[Tuple[int, int, int, int, float]]:
     bboxes = []
     for pred in predictions:
@@ -26,7 +24,6 @@ def get_bboxes(predictions, label: str) -> List[Tuple[int, int, int, int, float]
             bbox = (int(pred['box'][0]), int(pred['box'][1]), int(pred['box'][2]), int(pred['box'][3]), pred['confidence'], pred['name'])
             bboxes.append(bbox)
     return bboxes
-
 
 def ensure_minimum_detections(image, bboxes, label, min_count=1):
     if len(bboxes) >= min_count:
@@ -47,7 +44,6 @@ def ensure_minimum_detections(image, bboxes, label, min_count=1):
         bboxes = get_bboxes(labeled_preds, label)
         retries += 1
     return bboxes
-
 
 def process_images(model, image_paths: List[str]):
     results = {}
@@ -126,7 +122,6 @@ def process_images(model, image_paths: List[str]):
         results[image_path] = bboxes
     return results
 
-
 def save_images_with_bboxes(image_paths: List[str], results, output_folder: str):
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
@@ -151,12 +146,86 @@ def save_images_with_bboxes(image_paths: List[str], results, output_folder: str)
         output_path = os.path.join(output_folder, f"result_{idx}.jpg")
         image.save(output_path)
 
+def get_lung_volume(image_paths: List[str], results) -> List[Tuple[str, float]]:
+    VRX = []
+    for idx, image_path in enumerate(image_paths):
+        H1 = H2 = W1 = W2 = Wtemp1 = Wtemp2 = 0
+        for bbox in results[image_path]:
+            x1, y1, x2, y2, confidence, label = bbox
+            if label == 'right_lobe':
+                H1 = abs(y2 - y1)
+                W1 = abs(x2 - x1)
+                Wtemp1 = min(x1, x2)
+
+            if label == 'left_lobe':
+                H2 = abs(y2 - y1)
+                W2 = abs(x2 - x1)
+                Wtemp2 = max(x1, x2)
+
+        Wtot = abs(Wtemp2 - Wtemp1)
+        lung_volume = (Wtot / 2) * (H1 + H2) * ((W1 + W2) / 2)
+        VRX.append((image_path, lung_volume))
+    return VRX
+
+def get_heart_volume(image_paths: List[str], results) -> List[Tuple[str, float]]:
+    P = []
+    
+    for image_path in image_paths:
+        A = B = C = 0
+        for bbox in results[image_path]:
+            x1, y1, x2, y2, confidence, label = bbox
+            if label == 'diaphragm':
+                C = abs(x2 - x1)
+            
+            if label == 'heart':
+                A = abs(x2 - x1)
+                B = abs(y2 - y1)
+                break
+        
+        if C != 0:
+            P.append((image_path, ((A + B) / C)))
+        else:
+            P.append((image_path, None))
+    return P
+
+def extract_subsequent_folder_and_filename(image_path: str) -> str:
+    path_parts = Path(image_path).parts
+    if len(path_parts) > 2:
+        return os.path.join(path_parts[-2], path_parts[-1])
+    return image_path
+
+def save_volumes_to_csv(lung_volumes: List[Tuple[str, float]], heart_volumes: List[Tuple[str, float]], csv_filename: str):
+    with open(csv_filename, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(["Image Path", "Lung Volume", "Heart Volume"])
+        for lv, hv in zip(lung_volumes, heart_volumes):
+            image_path_lv = extract_subsequent_folder_and_filename(lv[0])
+            lung_volume = lv[1]
+            heart_volume = hv[1]
+            writer.writerow([image_path_lv, lung_volume, heart_volume])
 
 model_path = 'AIs/Segmentation/weights/best.pt'
-folder_path = '0TestDataset/Corona Virus Disease'
+folder_path = '0TestDataset'
 output_folder = '2TestResult'
 
 model = load_yolo_model(model_path)
-image_paths = select_random_images(folder_path)
+
+all_items = os.listdir(folder_path)
+subfolders = [os.path.join(folder_path, item) for item in all_items if os.path.isdir(os.path.join(folder_path, item))]
+image_paths = []
+print(subfolders)
+for subfolder in subfolders:
+    image_paths.extend(select_random_images(subfolder))
+    print(image_paths)
 results = process_images(model, image_paths)
+lung_volumes = get_lung_volume(image_paths, results)
+heart_volumes = get_heart_volume(image_paths, results)
+print("lung volumes:")
+print(lung_volumes)
+print("heart volumes:")
+print(heart_volumes)
 save_images_with_bboxes(image_paths, results, output_folder)
+
+csv_filename = 'volumes.csv'
+save_volumes_to_csv(lung_volumes, heart_volumes, csv_filename)
+print(f"Results saved to {csv_filename}")
