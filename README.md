@@ -1,2 +1,4 @@
-<h1>CXR Pneumonia AI Early Detection</h1>
-<p>This model is trained to identify Bacterial Pneumonia, Viral Pneumonia, Corona Virus Disease, Tubercolosis from already sick patient, but as well as predict the vulnerability of healthy patient to one of the diseases based upon the volume and the placement of lung and heart.</p>
+<h1>CXR Radiology Analysis and Diagnosis System</h1>
+<p>This AI system is designed to search and identify symptoms from CXR input following a human radiologist methodology</p>
+<p>The system consisted of 3 AI, one for getting segmentation of chest organs, one for searching for nodules that are prevalent in tuberculosis viral pneumonia and cancer patient, and one for classifying the lungs based on it's color and it's size.</p>
+<p>The system can identify the existence of cardiomegaly, Tuberculosis, Viral Pneumonia, Bacterial Pneumnia, COVID-19 disease (seperated from viral pneumonia family), Tumors, and abnormalities that may exist in the CXR</p>
