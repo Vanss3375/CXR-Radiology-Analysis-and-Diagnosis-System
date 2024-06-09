@@ -108,14 +108,14 @@ def initialProcessImage(model, image_path): #?
     bboxes.extend(left_lobes)
     bboxes.extend(right_lobes)
     bboxes.extend(diaphragms)
-    bboxes.extend(abnormalities)
+    # bboxes.extend(abnormalities)
     bboxes.extend(heart)
     results[image_path] = bboxes
     return results
 
 def noduleProcessImage(model,image_path,lungs):
     image = Image.open(image_path)
-    predictions = model(image, conf=0.00001)
+    predictions = model(image, conf=0.1)
     ax1,ay1,ax2,ay2,aconfidence,aname = lungs[0]
     bx1,by1,bx2,by2,bconfidence,bname = lungs[1]
     lung_x = lung_y = []
@@ -135,16 +135,12 @@ def noduleProcessImage(model,image_path,lungs):
     for i in range(len(nodules)):
         x1,y1,x2,y2,confidence,name = nodules[i]
         areas.append(abs(x2-x1)*abs(y2-y1))
-    if len(areas):
-        area_avg = sum(areas) / len(areas)/4
-    else:
-        area_avg = 0
     cleaned_nodules = []
     for i in range(len(nodules)):
         x1,y1,x2,y2,confidence,name = nodules[i]
-        if abs(x2-x1)*abs(y2-y1) < area_avg:
-            if min(x1,x2) > chest_area[0] and max(x1,x2) < chest_area[1] and min(y1,y2) > chest_area[2] and max(y1,y2) < chest_area[3]:
-                cleaned_nodules.append((x1,y1,x2,y2,confidence,name))
+        # if abs(x2-x1)*abs(y2-y1) < area_avg:
+        if min(x1,x2) > chest_area[0] and max(x1,x2) < chest_area[1] and min(y1,y2) > chest_area[2] and max(y1,y2) < chest_area[3]:
+            cleaned_nodules.append((x1,y1,x2,y2,confidence,name))
     return cleaned_nodules
     
 def saveSegmentImage(image_path, results, output_path,filename):
@@ -177,11 +173,6 @@ def saveSegmentImage(image_path, results, output_path,filename):
 def saveNoduleImage(image_path, results, output_path,filename):
     if not os.path.exists(output_path):
         os.makedirs(output_path)
-    
-    label_colors = {
-        'nodules': "green",
-    }
-    
     image = Image.open(image_path)
     fig, ax = plt.subplots(1)
     ax.imshow(image)
@@ -190,9 +181,10 @@ def saveNoduleImage(image_path, results, output_path,filename):
     y_top = height * 0.05
     for bbox in results:
         x1, y1, x2, y2, confidence, label = bbox
-        rect = patches.Rectangle((x1, y1), x2 - x1, y2 - y1, linewidth=1, edgecolor=label_colors.get(label, "red"), facecolor='none')
+        rect = patches.Rectangle((x1, y1), x2 - x1, y2 - y1, linewidth=1, edgecolor="red", facecolor='none')
         ax.add_patch(rect)
-    plt.text(0,0,f"Nodules Detection", color=label_colors.get(label, "red"), verticalalignment='top',horizontalalignment='left', bbox={'color': 'white', 'pad': 0})
+        plt.text(((x1+x2)/2), max(y1,y2), f"{confidence:.2f}", color="red", verticalalignment='top')
+    plt.text(0,0,f"Nodules Detection", color="red", verticalalignment='top',horizontalalignment='left', bbox={'color': 'white', 'pad': 0})
     output_path = os.path.join(output_path,filename)
     plt.axis('off')
     plt.savefig(output_path, bbox_inches='tight', pad_inches=0,dpi=300)
@@ -257,18 +249,18 @@ def countHeartVolume(image_path, results) -> List[Tuple[str, float]]:
     P.append((image_path, Vol, Abnormalities))
     return P
 
-input_image = '1DataSet/Viral Pneumonia/20.jpeg'
+input_image = '1DataSet/Normal/11.jpeg'
 output_path = 'output'
 img1_output = 'segmentation.jpg'
 img2_output = 'nodule.jpg'
 
 segmentation_Path = 'AIs/Segmentation/weights/best.pt'
-nodule_Path = 'AIs/Nodule/train14/weights/best.pt'
+nodule_Path2 = 'AIs/NoduleV3/weights/best.pt'
 classification_MLp_model = 'AIs/Classification NN/weights/mlp_model.joblib'
 classification_scaler_model = 'AIs/Classification NN/weights/scaler.joblib'
 
 Segmentation_Model = loadYolo(segmentation_Path)
-Nodule_Model = loadYolo(nodule_Path)
+Nodule_Model = loadYolo(nodule_Path2)
 Classification_Mlp = joblib.load(classification_MLp_model)
 Classification_Scaler = joblib.load(classification_scaler_model)
 
@@ -276,7 +268,6 @@ results1 = initialProcessImage(Segmentation_Model, input_image)
 lung_volumes = countLungVolume(input_image, results1)
 heart_volumes = countHeartVolume(input_image, results1)
 results2 = noduleProcessImage(Nodule_Model, input_image,[results1[input_image][0], results1[input_image][1]])
-print(results2)
 saveSegmentImage(input_image, results1, output_path,img1_output)
 saveNoduleImage(input_image, results2, output_path,img2_output)
 new_data = pd.DataFrame({
@@ -325,7 +316,7 @@ Findings:
     Left Lung : {decoded_predictions[0]}*,
     Right Lung : {decoded_predictions[1]}*,
     Heart Ratio : {(heart_volumes[0][1])*100:.3f}% ({heart_volumes[0][2]}*)
-    Nodules(x,y) : {(', '.join([f"({(item[0]+item[2])/2},{(item[1]+item[3])/2})" for item in results2]))}
+    Nodules(x,y)-Certainty : {(', '.join([f"({(item[0]+item[2])/2},{(item[1]+item[3])/2})-{item[4]*100:.3f}%" for item in results2]))}
     
 """
 pdf.multi_cell(0, 10, paragraph)
