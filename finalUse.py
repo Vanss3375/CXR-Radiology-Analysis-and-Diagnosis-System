@@ -11,9 +11,9 @@ from pathlib import Path
 from ultralytics import YOLO
 from typing import List, Tuple
 import matplotlib.pyplot as plt
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageOps
 import matplotlib.patches as patches
-
+import shutil
 def loadYolo(model_path: str):
     model = YOLO(model_path)
     return model
@@ -26,6 +26,17 @@ def replaceEmpty(value): #?
             return 0
         else:
             return value
+
+def copyInputImage(src_path, dest_dir):
+    if not os.path.exists(src_path):
+        raise FileNotFoundError(f"Source file does not exist: {src_path}")
+
+    if not os.path.exists(dest_dir):
+        os.makedirs(dest_dir)
+    file_name = 'input.jpg'
+    dest_path = os.path.join(dest_dir, file_name)
+    shutil.copy2(src_path, dest_path)
+    return dest_path
 
 def getBBOXes(predictions, label: str) -> List[Tuple[int, int, int, int, float]]:
     bboxes = []
@@ -63,7 +74,7 @@ def ensureObjectDetection(model, image, bboxes, label, min_count=1):
 def initialProcessImage(model, image_path): #?
     results = {}
     print(f"Image: {image_path}")
-    image = Image.open(image_path)
+    image = Image.open(image_path).convert("L")
     bboxes = []
     predictions = model(image)
     predictions = predictions[0].boxes.data.cpu().numpy()
@@ -113,15 +124,16 @@ def initialProcessImage(model, image_path): #?
     results[image_path] = bboxes
     return results
 
-def noduleProcessImage(model,image_path,lungs):
-    image = Image.open(image_path)
+def noduleProcessImage(model, image_path, lungs):
+    image = Image.open(image_path).convert("L")
+    image = ImageOps.equalize(image)
     predictions = model(image, conf=0.1)
-    ax1,ay1,ax2,ay2,aconfidence,aname = lungs[0]
-    bx1,by1,bx2,by2,bconfidence,bname = lungs[1]
+    ax1, ay1, ax2, ay2, aconfidence, aname = lungs[0]
+    bx1, by1, bx2, by2, bconfidence, bname = lungs[1]
     lung_x = lung_y = []
-    lung_x.extend([ax1,ax2,bx1,bx2])
-    lung_y.extend([ay1,ay2,by1,by2])
-    chest_area = [min(lung_x),max(lung_x),min(lung_y),max(lung_y)]
+    lung_x.extend([ax1, ax2, bx1, bx2])
+    lung_y.extend([ay1, ay2, by1, by2])
+    chest_area = [min(lung_x), max(lung_x), min(lung_y), max(lung_y)]
     predictions = predictions[0].boxes.data.cpu().numpy()
     labels = predictions[:, -1]
     boxes = predictions[:, :-1]
@@ -133,15 +145,14 @@ def noduleProcessImage(model,image_path,lungs):
     nodules.sort(key=lambda x: x[4], reverse=True)
     areas = []
     for i in range(len(nodules)):
-        x1,y1,x2,y2,confidence,name = nodules[i]
-        areas.append(abs(x2-x1)*abs(y2-y1))
+        x1, y1, x2, y2, confidence, name = nodules[i]
+        areas.append(abs(x2 - x1) * abs(y2 - y1))
     cleaned_nodules = []
     for i in range(len(nodules)):
-        x1,y1,x2,y2,confidence,name = nodules[i]
-        # if abs(x2-x1)*abs(y2-y1) < area_avg:
-        if min(x1,x2) > chest_area[0] and max(x1,x2) < chest_area[1] and min(y1,y2) > chest_area[2] and max(y1,y2) < chest_area[3]:
-            cleaned_nodules.append((x1,y1,x2,y2,confidence,name))
-    return cleaned_nodules
+        x1, y1, x2, y2, confidence, name = nodules[i]
+        if min(x1, x2) > chest_area[0] and max(x1, x2) < chest_area[1] and min(y1, y2) > chest_area[2] and max(y1, y2) < chest_area[3]:
+            cleaned_nodules.append((x1, y1, x2, y2, confidence, name))
+    return nodules
     
 def saveSegmentImage(image_path, results, output_path,filename):
     if not os.path.exists(output_path):
@@ -155,9 +166,9 @@ def saveSegmentImage(image_path, results, output_path,filename):
         'heart': "orange"
     }
     
-    image = Image.open(image_path)
+    image = Image.open(image_path).convert("L")
     fig, ax = plt.subplots(1)
-    ax.imshow(image)
+    ax.imshow(image, cmap='gray')
 
     for bbox in results[image_path]:
         x1, y1, x2, y2, confidence, label = bbox
@@ -173,9 +184,9 @@ def saveSegmentImage(image_path, results, output_path,filename):
 def saveNoduleImage(image_path, results, output_path,filename):
     if not os.path.exists(output_path):
         os.makedirs(output_path)
-    image = Image.open(image_path)
+    image = Image.open(image_path).convert("L")
     fig, ax = plt.subplots(1)
-    ax.imshow(image)
+    ax.imshow(image, cmap='gray')
     width, height= image.size
     x_center = width / 2
     y_top = height * 0.05
@@ -249,7 +260,7 @@ def countHeartVolume(image_path, results) -> List[Tuple[str, float]]:
     P.append((image_path, Vol, Abnormalities))
     return P
 
-input_image = '1DataSet/Normal/11.jpeg'
+input_image = '1DataSet/Viral Pneumonia/3.jpeg'
 output_path = 'output'
 img1_output = 'segmentation.jpg'
 img2_output = 'nodule.jpg'
@@ -264,12 +275,13 @@ Nodule_Model = loadYolo(nodule_Path2)
 Classification_Mlp = joblib.load(classification_MLp_model)
 Classification_Scaler = joblib.load(classification_scaler_model)
 
-results1 = initialProcessImage(Segmentation_Model, input_image)
-lung_volumes = countLungVolume(input_image, results1)
-heart_volumes = countHeartVolume(input_image, results1)
-results2 = noduleProcessImage(Nodule_Model, input_image,[results1[input_image][0], results1[input_image][1]])
-saveSegmentImage(input_image, results1, output_path,img1_output)
-saveNoduleImage(input_image, results2, output_path,img2_output)
+new_input_image = copyInputImage(input_image,output_path)
+results1 = initialProcessImage(Segmentation_Model, new_input_image)
+lung_volumes = countLungVolume(new_input_image, results1)
+heart_volumes = countHeartVolume(new_input_image, results1)
+results2 = noduleProcessImage(Nodule_Model, new_input_image,[results1[new_input_image][0], results1[new_input_image][1]])
+saveSegmentImage(new_input_image, results1, output_path,img1_output)
+saveNoduleImage(new_input_image, results2, output_path,img2_output)
 new_data = pd.DataFrame({
     'Right Lung Size': [lung_volumes[0][2]],
     'Left Lung Size': [lung_volumes[0][3]],
@@ -329,7 +341,7 @@ wmax = pdf.w/2 - padding_global
 x1 = 0 + padding_global
 x2 = wmax + x1
 w1 = w2 = wmax
-pdf.image(input_image, x=x1, y=img_y, w=w1)
+pdf.image(new_input_image, x=x1, y=img_y, w=w1)
 pdf.image(os.path.join(output_path,img1_output), x= x2, y=img_y, w=w2)
 pdf.image(os.path.join(output_path,img2_output), x= x1, y=w1*1.45, w=w1)
 paragraph = f"""
