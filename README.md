@@ -10,7 +10,9 @@
   4. Then run the python code.</p>
 
 # output :
-
+![nodule](https://github.com/Vanss3375/CXR-Radiology-Analysis-and-Diagnosis-System/blob/main/output/nodule.jpg)
+![organ secmentation](https://github.com/Vanss3375/CXR-Radiology-Analysis-and-Diagnosis-System/blob/main/output/segmentation.jpg)
+![malignant cancer](https://github.com/Vanss3375/CXR-Radiology-Analysis-and-Diagnosis-System/blob/main/hasil%20dari%20train%20new%20dataset%20malignant%20cancer/result/hasil-test-sample/val_batch0_pred.jpg)
 
 # attachment
 
