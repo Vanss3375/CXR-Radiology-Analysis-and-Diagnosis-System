@@ -9,6 +9,9 @@
   3. Then open the "finalUser.py" file and change the input image,</br>
   4. Then run the python code.</p>
 
+# about this detailed project can be access here :
+![canva link](https://www.canva.com/design/DAGSN3M2UDE/S2qZr2CKzxdLT-lIDS6yjQ/edit?utm_content=DAGSN3M2UDE&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton)
+
 # output :
 ![nodule](https://github.com/Vanss3375/CXR-Radiology-Analysis-and-Diagnosis-System/blob/main/output/nodule.jpg)
 ![organ secmentation](https://github.com/Vanss3375/CXR-Radiology-Analysis-and-Diagnosis-System/blob/main/output/segmentation.jpg)
@@ -18,4 +21,6 @@
 
 <h3>The result can be access here : </h3>
 ![result](https://github.com/Vanss3375/CXR-Radiology-Analysis-and-Diagnosis-System/blob/main/output/result.pdf)
+
+
 
