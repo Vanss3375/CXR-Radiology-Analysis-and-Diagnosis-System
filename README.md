@@ -9,5 +9,11 @@
   3. Then open the "finalUser.py" file and change the input image,</br>
   4. Then run the python code.</p>
 
+# output :
+
+
 # attachment
+
+<h3>The result can be access here : </h3>
+![result](https://github.com/Vanss3375/CXR-Radiology-Analysis-and-Diagnosis-System/blob/main/output/result.pdf)
 
